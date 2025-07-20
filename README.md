@@ -1,6 +1,8 @@
 # Text Highlighter for Zed
 
-A Zed extension that replicates the functionality of VS Code's text-marker extension, allowing you to highlight and navigate through text patterns in your code.
+A Zed extension that aims to replicate the functionality of VS Code's text-marker extension, allowing you to highlight and navigate through text patterns in your code.
+
+> **IMPORTANT**: Due to current limitations in the Zed extension API (0.5.0), the highlighting feature cannot directly modify the editor's visual display. This extension tracks highlight patterns internally but cannot apply visual highlights yet. We're waiting for future Zed API enhancements to fully implement this feature.
 
 ## Features
 
@@ -41,6 +43,8 @@ Remove all text highlights from the current editor.
 
 ## Installation
 
+> **NOTE**: This extension currently has limited functionality due to Zed API restrictions.
+
 1. Clone or download this extension
 2. Build the extension for WebAssembly target:
    ```bash
@@ -49,13 +53,23 @@ Remove all text highlights from the current editor.
    ```
 3. Copy the compiled WASM file to the extension directory:
    ```bash
-   cp target/wasm32-wasip1/release/deps/high_lighter.wasm extension.wasm
+   cp target/wasm32-wasip1/release/high_lighter.wasm extension.wasm
    ```
 4. Install the extension in Zed:
    - Open Zed's settings with `Cmd+,` (Mac) or `Ctrl+,` (Windows/Linux)
    - Navigate to the Extensions tab
    - Click "Add Extension" and browse to the extension directory
    - Select the directory containing `extension.toml` and `extension.wasm`
+
+## API Limitations
+
+Currently, the Zed extension API (0.5.0) does not provide:
+
+1. Direct access to editor text decoration or highlighting
+2. Methods to apply visual styles to matched text patterns
+3. Methods to execute built-in commands like search from extensions
+
+These limitations prevent this extension from applying visual highlights to the editor content. The extension will store highlight patterns internally, but cannot display them visually until Zed enhances its extension API.
 
 For publishing to the official Zed extensions repository:
 1. Fork the [zed-industries/extensions](https://github.com/zed-industries/extensions) repository
@@ -90,9 +104,11 @@ cp target/wasm32-wasip1/release/deps/high_lighter.wasm extension.wasm
 1. Install the extension in Zed using the instructions in the Installation section
 2. Open a text file in Zed
 3. Type `/highlight` followed by the text you want to highlight
-4. The text should be highlighted in the editor
-5. Test navigation with `/next_highlight` and `/prev_highlight`
-6. Clear highlights with `/clear_highlights`
+4. Currently, the text will NOT be highlighted in the editor due to API limitations
+5. The extension will store the pattern internally for future use
+6. Commands `/next_highlight`, `/prev_highlight` and `/clear_highlights` are registered but have limited functionality
+
+**Note**: Full functionality will be implemented when the Zed extension API provides the necessary capabilities.
 
 ## Architecture
 
@@ -101,7 +117,7 @@ The extension uses:
 - **RwLock** for thread-safe state management
 - **HashMap** to store highlight patterns by category
 - **Color cycling** through predefined highlight colors
-- **Zed's search API** to apply highlights in the editor
+- Internal pattern storage for future highlighting capabilities
 
 Highlight patterns store:
 - Pattern text
@@ -114,9 +130,11 @@ Highlight patterns store:
 
 The extension works by:
 1. Storing highlight patterns in memory when `/highlight` is called
-2. Using Zed's built-in search functionality to visually highlight matches
-3. Supporting toggle behavior (calling highlight with the same pattern removes it)
-4. Managing multiple highlight patterns with different colors
+2. Supporting toggle behavior (calling highlight with the same pattern removes it)
+3. Managing multiple highlight patterns with different colors
+4. **Pending Zed API enhancements**: Visual highlighting of matched text is not yet possible
+
+Currently, this extension tracks patterns internally but cannot apply visual highlights until Zed enhances its extension API with text decoration capabilities.
 
 ## License
 

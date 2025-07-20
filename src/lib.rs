@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 use zed_extension_api::{
-    self as zed, 
+    self as zed,
     SlashCommand, SlashCommandArgumentCompletion, SlashCommandOutput,
     SlashCommandOutputSection, Worktree,
 };
@@ -93,9 +93,10 @@ impl zed::Extension for HighLighterExtension {
                 let pattern = pattern_args.join(" ");
                 let was_added = self.toggle_highlight(pattern.clone(), options.clone());
                 
-                // We store the highlight patterns in memory
-                // The editor highlighting will be handled by Zed's built-in search mechanism
-                // through the slash command execution
+                // We cannot directly highlight text through the API
+                // but we'll add the pattern to our state
+                // NOTE: The API currently doesn't provide direct text highlighting
+                // Zed would need to implement this functionality in a future API version
                 
                 let mut flags = Vec::new();
                 if options.case_sensitive {
@@ -132,9 +133,15 @@ impl zed::Extension for HighLighterExtension {
                         text: "No highlights found. Use /highlight to add some.".to_string(),
                     });
                 }
-                
-                // For navigation, we'll rely on Zed's built-in search functionality
-                // The patterns are stored in our extension state
+
+                // NOTE: With the current API limitations, we can't directly
+                // implement navigation between highlights
+                let patterns = self.get_all_patterns();
+                if !patterns.is_empty() {
+                    // Log what we would do if API supported it
+                    println!("Would navigate to next highlight for pattern: {}", 
+                            patterns.first().unwrap().pattern);
+                }
 
                 Ok(SlashCommandOutput {
                     sections: vec![],
@@ -148,9 +155,15 @@ impl zed::Extension for HighLighterExtension {
                         text: "No highlights found. Use /highlight to add some.".to_string(),
                     });
                 }
-                
-                // For navigation, we'll rely on Zed's built-in search functionality
-                // The patterns are stored in our extension state
+
+                // NOTE: With the current API limitations, we can't directly
+                // implement navigation between highlights
+                let patterns = self.get_all_patterns();
+                if !patterns.is_empty() {
+                    // Log what we would do if API supported it
+                    println!("Would navigate to previous highlight for pattern: {}", 
+                            patterns.first().unwrap().pattern);
+                }
 
                 Ok(SlashCommandOutput {
                     sections: vec![],
@@ -161,8 +174,8 @@ impl zed::Extension for HighLighterExtension {
                 let count = self.get_all_patterns().len();
                 self.clear_all_highlights();
                 
-                // Clear all patterns from our state
-                // Zed's editor will handle clearing highlights
+                // NOTE: With the current API limitations, we can't directly
+                // clear highlights. Only clearing our internal state.
                 
                 Ok(SlashCommandOutput {
                     sections: vec![],
@@ -211,11 +224,8 @@ impl HighLighterExtension {
     }
     
     fn clear_all_highlights(&self) {
-        let mut state = self.state.write().unwrap();
-        state.highlights.clear();
+        self.state.write().unwrap().highlights.clear();
     }
-    
-
     
     fn get_all_patterns(&self) -> Vec<HighlightPattern> {
         self.state.read().unwrap()
