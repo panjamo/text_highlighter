@@ -1,0 +1,228 @@
+use std::collections::HashMap;
+use std::sync::RwLock;
+use zed_extension_api::{
+    self as zed, SlashCommand, SlashCommandArgumentCompletion, SlashCommandOutput,
+    SlashCommandOutputSection, Worktree,
+};
+
+struct HighLighterExtension {
+    state: RwLock<HighLighterState>,
+}
+
+struct HighLighterState {
+    highlights: HashMap<String, Vec<HighlightPattern>>,
+    colors: Vec<String>,
+    current_color_index: usize,
+}
+
+#[derive(Clone)]
+struct HighlightPattern {
+    pattern: String,
+    color: String,
+    case_sensitive: bool,
+    whole_word: bool,
+    is_regex: bool,
+}
+
+impl zed::Extension for HighLighterExtension {
+    fn new() -> Self {
+        Self {
+            state: RwLock::new(HighLighterState {
+                highlights: HashMap::new(),
+                colors: vec![
+                    "#FFD700".to_string(), // Gold
+                    "#FF6347".to_string(), // Tomato
+                    "#32CD32".to_string(), // LimeGreen
+                    "#FF1493".to_string(), // DeepPink
+                    "#00CED1".to_string(), // DarkTurquoise
+                    "#9370DB".to_string(), // MediumPurple
+                    "#FFA500".to_string(), // Orange
+                    "#20B2AA".to_string(), // LightSeaGreen
+                ],
+                current_color_index: 0,
+            }),
+        }
+    }
+
+    fn complete_slash_command_argument(
+        &self,
+        command: SlashCommand,
+        _args: Vec<String>,
+    ) -> Result<Vec<SlashCommandArgumentCompletion>, String> {
+        match command.name.as_str() {
+            "highlight" => Ok(vec![
+                SlashCommandArgumentCompletion {
+                    label: "Case Sensitive".to_string(),
+                    new_text: "--case-sensitive ".to_string(),
+                    run_command: false,
+                },
+                SlashCommandArgumentCompletion {
+                    label: "Whole Word".to_string(),
+                    new_text: "--whole-word ".to_string(),
+                    run_command: false,
+                },
+                SlashCommandArgumentCompletion {
+                    label: "Regex Pattern".to_string(),
+                    new_text: "--regex ".to_string(),
+                    run_command: false,
+                },
+            ]),
+            "next_highlight" | "prev_highlight" | "clear_highlights" => Ok(vec![]),
+            command => Err(format!("unknown slash command: \"{}\"", command)),
+        }
+    }
+
+    fn run_slash_command(
+        &self,
+        command: SlashCommand,
+        args: Vec<String>,
+        _worktree: Option<&Worktree>,
+    ) -> Result<SlashCommandOutput, String> {
+        match command.name.as_str() {
+            "highlight" => {
+                if args.is_empty() {
+                    return Err("Please provide text to highlight".to_string());
+                }
+
+                let (options, pattern_args) = HighlightOptions::from_args(&args);
+                if pattern_args.is_empty() {
+                    return Err("Please provide text to highlight after options".to_string());
+                }
+
+                let pattern = pattern_args.join(" ");
+                let was_added = self.toggle_highlight(pattern.clone(), options);
+                
+                let action = if was_added { "Added" } else { "Removed" };
+                let result_text = format!("{} highlight for pattern: {}", action, pattern);
+                
+                Ok(SlashCommandOutput {
+                    sections: vec![SlashCommandOutputSection {
+                        range: (0..result_text.len()).into(),
+                        label: "Text Highlighter".to_string(),
+                    }],
+                    text: result_text,
+                })
+            }
+            "next_highlight" => {
+                let pattern_count = self.get_all_patterns().len();
+                if pattern_count == 0 {
+                    return Ok(SlashCommandOutput {
+                        sections: vec![],
+                        text: "No highlights found. Use /highlight to add some.".to_string(),
+                    });
+                }
+
+                Ok(SlashCommandOutput {
+                    sections: vec![],
+                    text: format!("Navigating to next highlight... ({} patterns active)", pattern_count),
+                })
+            }
+            "prev_highlight" => {
+                let pattern_count = self.get_all_patterns().len();
+                if pattern_count == 0 {
+                    return Ok(SlashCommandOutput {
+                        sections: vec![],
+                        text: "No highlights found. Use /highlight to add some.".to_string(),
+                    });
+                }
+
+                Ok(SlashCommandOutput {
+                    sections: vec![],
+                    text: format!("Navigating to previous highlight... ({} patterns active)", pattern_count),
+                })
+            }
+            "clear_highlights" => {
+                let count = self.get_all_patterns().len();
+                self.clear_all_highlights();
+                
+                Ok(SlashCommandOutput {
+                    sections: vec![],
+                    text: format!("Cleared {} highlight patterns", count),
+                })
+            }
+            command => Err(format!("unknown slash command: \"{}\"", command)),
+        }
+    }
+}
+
+impl HighLighterExtension {
+    fn toggle_highlight(&self, pattern: String, options: HighlightOptions) -> bool {
+        let mut state = self.state.write().unwrap();
+        let color = state.get_next_color();
+        
+        // Check if pattern already exists
+        if let Some(patterns) = state.highlights.get_mut("default") {
+            if let Some(pos) = patterns.iter().position(|p| p.pattern == pattern) {
+                // Remove existing highlight
+                patterns.remove(pos);
+                return false; // Removed
+            }
+        }
+        
+        // Add new highlight
+        let highlight = HighlightPattern {
+            pattern: pattern.clone(),
+            color,
+            case_sensitive: options.case_sensitive,
+            whole_word: options.whole_word,
+            is_regex: options.is_regex,
+        };
+        
+        state.highlights
+            .entry("default".to_string())
+            .or_insert_with(Vec::new)
+            .push(highlight);
+        
+        true // Added
+    }
+    
+    fn clear_all_highlights(&self) {
+        self.state.write().unwrap().highlights.clear();
+    }
+    
+    fn get_all_patterns(&self) -> Vec<HighlightPattern> {
+        self.state.read().unwrap()
+            .highlights
+            .values()
+            .flat_map(|patterns| patterns.iter())
+            .cloned()
+            .collect()
+    }
+}
+
+impl HighLighterState {
+    fn get_next_color(&mut self) -> String {
+        let color = self.colors[self.current_color_index].clone();
+        self.current_color_index = (self.current_color_index + 1) % self.colors.len();
+        color
+    }
+}
+
+#[derive(Default)]
+struct HighlightOptions {
+    case_sensitive: bool,
+    whole_word: bool,
+    is_regex: bool,
+}
+
+impl HighlightOptions {
+    fn from_args(args: &[String]) -> (Self, Vec<String>) {
+        let mut options = Self::default();
+        let mut remaining_args = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--case-sensitive" => options.case_sensitive = true,
+                "--whole-word" => options.whole_word = true,
+                "--regex" => options.is_regex = true,
+                arg => remaining_args.push(arg.to_string()),
+            }
+            i += 1;
+        }
+        
+        (options, remaining_args)
+    }
+}
+
+zed::register_extension!(HighLighterExtension);

@@ -1,0 +1,23 @@
+id = "high_lighter"
+name = "Text Highlighter"
+version = "0.1.0"
+schema_version = 1
+authors = ["Developer <dev@example.com>"]
+description = "Highlight and navigate through text patterns in your code, similar to VS Code's text-marker extension"
+repository = "https://github.com/example/high_lighter"
+
+[slash_commands.highlight]
+description = "Toggle highlighting for selected text or search pattern"
+requires_argument = true
+
+[slash_commands.next_highlight]
+description = "Jump to next highlighted text"
+requires_argument = false
+
+[slash_commands.prev_highlight]
+description = "Jump to previous highlighted text" 
+requires_argument = false
+
+[slash_commands.clear_highlights]
+description = "Clear all highlights"
+requires_argument = false
