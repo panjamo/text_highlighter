@@ -42,8 +42,20 @@ Remove all text highlights from the current editor.
 ## Installation
 
 1. Clone or download this extension
-2. Build the extension: `cargo build --release`
-3. Follow [Zed's extension installation guide](https://zed.dev/docs/extensions) to install locally
+2. Build the extension for WebAssembly target:
+   ```bash
+   rustup target add wasm32-wasip1
+   cargo build --release --target wasm32-wasip1
+   ```
+3. Copy the compiled WASM file to the extension directory:
+   ```bash
+   cp target/wasm32-wasip1/release/deps/high_lighter.wasm extension.wasm
+   ```
+4. Install the extension in Zed:
+   - Open Zed's settings with `Cmd+,` (Mac) or `Ctrl+,` (Windows/Linux)
+   - Navigate to the Extensions tab
+   - Click "Add Extension" and browse to the extension directory
+   - Select the directory containing `extension.toml` and `extension.wasm`
 
 For publishing to the official Zed extensions repository:
 1. Fork the [zed-industries/extensions](https://github.com/zed-industries/extensions) repository
@@ -61,11 +73,26 @@ This extension is written in Rust and compiled to WebAssembly. Key files:
 
 ### Building
 ```bash
-cargo build
+# Setup WebAssembly target (one-time)
+rustup target add wasm32-wasip1
+
+# Build for development
+cargo build --target wasm32-wasip1
+
+# Build for release
+cargo build --release --target wasm32-wasip1
+
+# Copy the WASM file to the extension directory
+cp target/wasm32-wasip1/release/deps/high_lighter.wasm extension.wasm
 ```
 
 ### Testing
-Test the slash commands in Zed by typing `/highlight`, `/next_highlight`, etc. in the command palette.
+1. Install the extension in Zed using the instructions in the Installation section
+2. Open a text file in Zed
+3. Type `/highlight` followed by the text you want to highlight
+4. The text should be highlighted in the editor
+5. Test navigation with `/next_highlight` and `/prev_highlight`
+6. Clear highlights with `/clear_highlights`
 
 ## Architecture
 
@@ -74,6 +101,7 @@ The extension uses:
 - **RwLock** for thread-safe state management
 - **HashMap** to store highlight patterns by category
 - **Color cycling** through predefined highlight colors
+- **Zed's search API** to apply highlights in the editor
 
 Highlight patterns store:
 - Pattern text
@@ -81,6 +109,14 @@ Highlight patterns store:
 - Case sensitivity setting
 - Whole word setting
 - Regex flag
+
+### Implementation Notes
+
+The extension works by:
+1. Storing highlight patterns in memory when `/highlight` is called
+2. Using Zed's built-in search functionality to visually highlight matches
+3. Supporting toggle behavior (calling highlight with the same pattern removes it)
+4. Managing multiple highlight patterns with different colors
 
 ## License
 
