@@ -90,10 +90,27 @@ impl zed::Extension for HighLighterExtension {
                 }
 
                 let pattern = pattern_args.join(" ");
-                let was_added = self.toggle_highlight(pattern.clone(), options);
+                let was_added = self.toggle_highlight(pattern.clone(), options.clone());
+                
+                let mut flags = Vec::new();
+                if options.case_sensitive {
+                    flags.push("case-sensitive");
+                }
+                if options.whole_word {
+                    flags.push("whole-word");
+                }
+                if options.is_regex {
+                    flags.push("regex");
+                }
+                
+                let flag_str = if flags.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", flags.join(", "))
+                };
                 
                 let action = if was_added { "Added" } else { "Removed" };
-                let result_text = format!("{} highlight for pattern: {}", action, pattern);
+                let result_text = format!("{} highlight for pattern: '{}'{}", action, pattern, flag_str);
                 
                 Ok(SlashCommandOutput {
                     sections: vec![SlashCommandOutputSection {
@@ -104,8 +121,7 @@ impl zed::Extension for HighLighterExtension {
                 })
             }
             "next_highlight" => {
-                let pattern_count = self.get_all_patterns().len();
-                if pattern_count == 0 {
+                if self.get_all_patterns().is_empty() {
                     return Ok(SlashCommandOutput {
                         sections: vec![],
                         text: "No highlights found. Use /highlight to add some.".to_string(),
@@ -114,12 +130,11 @@ impl zed::Extension for HighLighterExtension {
 
                 Ok(SlashCommandOutput {
                     sections: vec![],
-                    text: format!("Navigating to next highlight... ({} patterns active)", pattern_count),
+                    text: format!("Navigating to next highlight... {}", self.get_pattern_summary()),
                 })
             }
             "prev_highlight" => {
-                let pattern_count = self.get_all_patterns().len();
-                if pattern_count == 0 {
+                if self.get_all_patterns().is_empty() {
                     return Ok(SlashCommandOutput {
                         sections: vec![],
                         text: "No highlights found. Use /highlight to add some.".to_string(),
@@ -128,7 +143,7 @@ impl zed::Extension for HighLighterExtension {
 
                 Ok(SlashCommandOutput {
                     sections: vec![],
-                    text: format!("Navigating to previous highlight... ({} patterns active)", pattern_count),
+                    text: format!("Navigating to previous highlight... {}", self.get_pattern_summary()),
                 })
             }
             "clear_highlights" => {
@@ -150,9 +165,14 @@ impl HighLighterExtension {
         let mut state = self.state.write().unwrap();
         let color = state.get_next_color();
         
-        // Check if pattern already exists
+        // Check if pattern already exists (match by pattern AND options)
         if let Some(patterns) = state.highlights.get_mut("default") {
-            if let Some(pos) = patterns.iter().position(|p| p.pattern == pattern) {
+            if let Some(pos) = patterns.iter().position(|p| 
+                p.pattern == pattern && 
+                p.case_sensitive == options.case_sensitive && 
+                p.whole_word == options.whole_word && 
+                p.is_regex == options.is_regex
+            ) {
                 // Remove existing highlight
                 patterns.remove(pos);
                 return false; // Removed
@@ -188,6 +208,38 @@ impl HighLighterExtension {
             .cloned()
             .collect()
     }
+
+    fn get_pattern_summary(&self) -> String {
+        let patterns = self.get_all_patterns();
+        if patterns.is_empty() {
+            return "No active highlights".to_string();
+        }
+        
+        let count = patterns.len();
+        let mut summary = Vec::new();
+        for pattern in &patterns {
+            let mut flags = Vec::new();
+            if pattern.case_sensitive {
+                flags.push("case-sensitive");
+            }
+            if pattern.whole_word {
+                flags.push("whole-word");
+            }
+            if pattern.is_regex {
+                flags.push("regex");
+            }
+            
+            let flag_str = if flags.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", flags.join(", "))
+            };
+            
+            summary.push(format!("'{}'{} [{}]", pattern.pattern, flag_str, pattern.color));
+        }
+        
+        format!("{} active highlights: {}", count, summary.join(", "))
+    }
 }
 
 impl HighLighterState {
@@ -198,7 +250,7 @@ impl HighLighterState {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct HighlightOptions {
     case_sensitive: bool,
     whole_word: bool,
