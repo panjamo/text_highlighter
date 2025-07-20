@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 use zed_extension_api::{
-    self as zed,
+    self as zed, 
     SlashCommand, SlashCommandArgumentCompletion, SlashCommandOutput,
     SlashCommandOutputSection, Worktree,
 };
@@ -93,10 +93,13 @@ impl zed::Extension for HighLighterExtension {
                 let pattern = pattern_args.join(" ");
                 let was_added = self.toggle_highlight(pattern.clone(), options.clone());
                 
-                // We cannot directly highlight text through the API
-                // but we'll add the pattern to our state
-                // NOTE: The API currently doesn't provide direct text highlighting
-                // Zed would need to implement this functionality in a future API version
+                // IMPORTANT: API LIMITATION
+                // The current Zed extension API doesn't provide direct methods to highlight text.
+                // This extension tracks highlight patterns in memory, but can't apply visual highlighting.
+                // When the API adds text decoration capabilities, this code will be updated.
+                
+                // Note: To see highlighting, use Zed's built-in search functionality:
+                // Press Ctrl+F (or Cmd+F on Mac) and type the pattern manually
                 
                 let mut flags = Vec::new();
                 if options.case_sensitive {
@@ -116,7 +119,9 @@ impl zed::Extension for HighLighterExtension {
                 };
                 
                 let action = if was_added { "Added" } else { "Removed" };
-                let result_text = format!("{} highlight for pattern: '{}'{}", action, pattern, flag_str);
+                let api_note = " (Note: To see highlighting, use Zed's search with Ctrl+F/Cmd+F)";
+                let result_text = format!("{} highlight for pattern: '{}'{}{}", 
+                    action, pattern, flag_str, api_note);
                 
                 Ok(SlashCommandOutput {
                     sections: vec![SlashCommandOutputSection {
@@ -134,18 +139,15 @@ impl zed::Extension for HighLighterExtension {
                     });
                 }
 
-                // NOTE: With the current API limitations, we can't directly
-                // implement navigation between highlights
-                let patterns = self.get_all_patterns();
-                if !patterns.is_empty() {
-                    // Log what we would do if API supported it
-                    println!("Would navigate to next highlight for pattern: {}", 
-                            patterns.first().unwrap().pattern);
-                }
-
+                // API LIMITATION: Cannot navigate between highlights with current API
+                let note = " (Note: Use Zed's built-in search with F3 to navigate)";
+                
+                // Get pattern for display purposes only
+                let _patterns = self.get_all_patterns();
+                
                 Ok(SlashCommandOutput {
                     sections: vec![],
-                    text: format!("Navigating to next highlight... {}", self.get_pattern_summary()),
+                    text: format!("Navigating to next highlight...{}{}", self.get_pattern_summary(), note),
                 })
             }
             "prev_highlight" => {
@@ -156,30 +158,27 @@ impl zed::Extension for HighLighterExtension {
                     });
                 }
 
-                // NOTE: With the current API limitations, we can't directly
-                // implement navigation between highlights
-                let patterns = self.get_all_patterns();
-                if !patterns.is_empty() {
-                    // Log what we would do if API supported it
-                    println!("Would navigate to previous highlight for pattern: {}", 
-                            patterns.first().unwrap().pattern);
-                }
-
+                // API LIMITATION: Cannot navigate between highlights with current API
+                let note = " (Note: Use Zed's built-in search with Shift+F3 to navigate)";
+                
+                // Get pattern for display purposes only
+                let _patterns = self.get_all_patterns();
+                
                 Ok(SlashCommandOutput {
                     sections: vec![],
-                    text: format!("Navigating to previous highlight... {}", self.get_pattern_summary()),
+                    text: format!("Navigating to previous highlight...{}{}", self.get_pattern_summary(), note),
                 })
             }
             "clear_highlights" => {
                 let count = self.get_all_patterns().len();
                 self.clear_all_highlights();
                 
-                // NOTE: With the current API limitations, we can't directly
-                // clear highlights. Only clearing our internal state.
+                // API LIMITATION: Cannot clear highlights with current API
+                let note = " (Note: Use Esc in Zed's search to clear highlights)";
                 
                 Ok(SlashCommandOutput {
                     sections: vec![],
-                    text: format!("Cleared {} highlight patterns", count),
+                    text: format!("Cleared {} highlight patterns{}", count, note),
                 })
             }
             command => Err(format!("unknown slash command: \"{}\"", command)),
