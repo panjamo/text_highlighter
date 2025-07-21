@@ -21,3 +21,8 @@ requires_argument = false
 [slash_commands.clear_highlights]
 description = "Clear all highlights"
 requires_argument = false
+
+[language_servers.highlight-lsp]
+name = "Highlight LSP"
+languages = ["*"]
+command = { command = "./highlight-lsp", args = [] }

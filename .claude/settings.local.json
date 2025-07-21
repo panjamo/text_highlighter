@@ -8,7 +8,11 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.rs)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "WebFetch(domain:microsoft.github.io)",
+      "Bash(mkdir:*)",
+      "Bash(timeout 300 cargo build --release)",
+      "Bash(bash:*)"
     ],
     "deny": []
   }

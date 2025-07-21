@@ -14,13 +14,28 @@ fi
 echo "Compiling to WebAssembly..."
 cargo build --target wasm32-wasip1 --release
 
+# Build the highlight_lsp server
+echo "Building highlight_lsp server..."
+cd highlight-lsp
+cargo build --release
+cd ..
+
 # Copy the wasm file to the expected location
 echo "Copying WebAssembly file..."
 cp target/wasm32-wasip1/release/high_lighter.wasm extension.wasm
 
+# Copy the highlight-lsp binary to the extension root
+echo "Copying highlight-lsp binary..."
+if [ -f "highlight-lsp/target/release/highlight-lsp.exe" ]; then
+    cp highlight-lsp/target/release/highlight-lsp.exe .
+elif [ -f "highlight-lsp/target/release/highlight-lsp" ]; then
+    cp highlight-lsp/target/release/highlight-lsp .
+fi
+
 echo "Build complete! Files ready:"
 echo "  - extension.toml (manifest)"
 echo "  - extension.wasm (compiled extension)"
+echo "  - highlight-lsp (LSP server binary)"
 echo ""
 echo "To install in Zed:"
 echo "  1. Open Zed"

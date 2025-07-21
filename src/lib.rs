@@ -3,8 +3,9 @@ use std::sync::RwLock;
 use zed_extension_api::{
     self as zed, 
     SlashCommand, SlashCommandArgumentCompletion, SlashCommandOutput,
-    SlashCommandOutputSection, Worktree,
+    SlashCommandOutputSection, Worktree, LanguageServerId,
 };
+use zed::serde_json::json;
 
 struct HighLighterExtension {
     state: RwLock<HighLighterState>,
@@ -26,6 +27,30 @@ struct HighlightPattern {
 }
 
 impl zed::Extension for HighLighterExtension {
+    fn language_server_command(
+        &mut self,
+        _language_server_id: &LanguageServerId,
+        worktree: &Worktree,
+    ) -> Result<zed::Command, String> {
+        let server_path = worktree
+            .which("highlight-lsp")
+            .ok_or_else(|| "highlight-lsp must be installed and available in PATH".to_string())?
+            .to_string();
+
+        Ok(zed::Command {
+            command: server_path,
+            args: vec![],
+            env: Default::default(),
+        })
+    }
+
+    fn language_server_initialization_options(
+        &mut self,
+        _language_server_id: &LanguageServerId,
+        _worktree: &Worktree,
+    ) -> Result<Option<zed::serde_json::Value>, String> {
+        Ok(Some(json!({})))
+    }
     fn new() -> Self {
         Self {
             state: RwLock::new(HighLighterState {
@@ -93,13 +118,7 @@ impl zed::Extension for HighLighterExtension {
                 let pattern = pattern_args.join(" ");
                 let was_added = self.toggle_highlight(pattern.clone(), options.clone());
                 
-                // IMPORTANT: API LIMITATION
-                // The current Zed extension API doesn't provide direct methods to highlight text.
-                // This extension tracks highlight patterns in memory, but can't apply visual highlighting.
-                // When the API adds text decoration capabilities, this code will be updated.
-                
-                // Note: To see highlighting, use Zed's built-in search functionality:
-                // Press Ctrl+F (or Cmd+F on Mac) and type the pattern manually
+                // Note: LSP integration will be added when extension API supports it
                 
                 let mut flags = Vec::new();
                 if options.case_sensitive {
@@ -119,9 +138,8 @@ impl zed::Extension for HighLighterExtension {
                 };
                 
                 let action = if was_added { "Added" } else { "Removed" };
-                let api_note = " (Note: To see highlighting, use Zed's search with Ctrl+F/Cmd+F)";
-                let result_text = format!("{} highlight for pattern: '{}'{}{}", 
-                    action, pattern, flag_str, api_note);
+                let result_text = format!("{} highlight for pattern: '{}'{}", 
+                    action, pattern, flag_str);
                 
                 Ok(SlashCommandOutput {
                     sections: vec![SlashCommandOutputSection {
@@ -139,15 +157,12 @@ impl zed::Extension for HighLighterExtension {
                     });
                 }
 
-                // API LIMITATION: Cannot navigate between highlights with current API
-                let note = " (Note: Use Zed's built-in search with F3 to navigate)";
-                
                 // Get pattern for display purposes only
                 let _patterns = self.get_all_patterns();
                 
                 Ok(SlashCommandOutput {
                     sections: vec![],
-                    text: format!("Navigating to next highlight...{}{}", self.get_pattern_summary(), note),
+                    text: format!("Navigating to next highlight...{}", self.get_pattern_summary()),
                 })
             }
             "prev_highlight" => {
@@ -158,27 +173,23 @@ impl zed::Extension for HighLighterExtension {
                     });
                 }
 
-                // API LIMITATION: Cannot navigate between highlights with current API
-                let note = " (Note: Use Zed's built-in search with Shift+F3 to navigate)";
-                
                 // Get pattern for display purposes only
                 let _patterns = self.get_all_patterns();
                 
                 Ok(SlashCommandOutput {
                     sections: vec![],
-                    text: format!("Navigating to previous highlight...{}{}", self.get_pattern_summary(), note),
+                    text: format!("Navigating to previous highlight...{}", self.get_pattern_summary()),
                 })
             }
             "clear_highlights" => {
                 let count = self.get_all_patterns().len();
                 self.clear_all_highlights();
                 
-                // API LIMITATION: Cannot clear highlights with current API
-                let note = " (Note: Use Esc in Zed's search to clear highlights)";
+                // Note: LSP integration will be added when extension API supports it
                 
                 Ok(SlashCommandOutput {
                     sections: vec![],
-                    text: format!("Cleared {} highlight patterns{}", count, note),
+                    text: format!("Cleared {} highlight patterns", count),
                 })
             }
             command => Err(format!("unknown slash command: \"{}\"", command)),
